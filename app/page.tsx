@@ -1,0 +1,385 @@
+'use client';
+
+import { useState } from 'react';
+import { useWorkout } from '@/lib/workout-context';
+import { useSessionTimer } from '@/hooks/use-session-timer';
+import { useIntervalTimer } from '@/hooks/use-interval-timer';
+import { EXERCISES } from '@/constants/exercises';
+
+
+export default function Home() {
+  const { state, dispatch } = useWorkout();
+  const { elapsed, formatTime } = useSessionTimer(state.sessionData.start);
+  const intervalTimer = useIntervalTimer();
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [showFinishModal, setShowFinishModal] = useState(false);
+
+  const startWorkout = () => {
+    dispatch({ type: 'START_WORKOUT' });
+  };
+
+  const logSet = () => {
+    const newLog = {
+      id: crypto.randomUUID(),
+      exerciseId: state.currentExercise.id,
+      exerciseName: state.currentExercise.name,
+      bodyPart: state.currentExercise.part,
+      weight: state.weight,
+      reps: state.reps,
+      timestamp: new Date().toISOString(),
+    };
+    dispatch({ type: 'LOG_SET', log: newLog });
+    dispatch({ type: 'START_REST' });
+    intervalTimer.start(90);
+  };
+
+  const skipRest = () => {
+    intervalTimer.stop();
+    dispatch({ type: 'END_REST' });
+  };
+
+  const handleFinishClick = () => {
+    setShowFinishModal(true);
+  };
+
+  const confirmFinishWorkout = async () => {
+    setShowFinishModal(false);
+    dispatch({ type: 'SET_SAVING', isSaving: true });
+    
+    const endTime = Date.now();
+    
+    try {
+      const logs = state.logs.map(log => ({
+        date: log.timestamp,
+        menu: log.exerciseName,
+        bodyPart: log.bodyPart,
+        weight: log.weight,
+        reps: log.reps,
+      }));
+      
+      const session = {
+        date: new Date(state.sessionData.start!).toISOString().split('T')[0],
+        startTime: new Date(state.sessionData.start!).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+        durationMin: Math.ceil((endTime - state.sessionData.start!) / 1000 / 60),
+      };
+      
+      // API Routeを経由してNotionに送信
+      const response = await fetch('/api/notion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ logs, session }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to sync to Notion');
+      }
+    } catch (error) {
+      console.error('Failed to sync to Notion:', error);
+      alert('Notionへの送信に失敗しました。コンソールを確認してください。');
+    }
+    
+    dispatch({ type: 'SET_SAVING', isSaving: false });
+    dispatch({ type: 'FINISH_WORKOUT', endTime });
+  };
+
+  const resetWorkout = () => {
+    dispatch({ type: 'RESET' });
+  };
+
+  const changeExercise = (exerciseId: string) => {
+    const exercise = EXERCISES.find(ex => ex.id === exerciseId);
+    if (exercise) {
+      dispatch({ type: 'CHANGE_EXERCISE', exercise });
+      setShowExerciseModal(false);
+    }
+  };
+
+  const copyLastSet = () => {
+    const lastLog = state.logs.find(log => log.exerciseId === state.currentExercise.id);
+    if (lastLog) {
+      dispatch({ type: 'SET_WEIGHT', weight: lastLog.weight });
+      dispatch({ type: 'SET_REPS', reps: lastLog.reps });
+    }
+  };
+
+  const currentSetNumber = state.logs.filter(l => l.exerciseId === state.currentExercise.id).length + 1;
+
+  // IDLE状態
+  if (state.status === 'IDLE') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <div className="mb-12 text-center">
+            <div className="text-8xl mb-6">💪</div>
+            <h1 className="text-5xl font-black mb-2">MUSCLE TRACKER</h1>
+            <p className="text-lg opacity-70">今日の限界を超えろ</p>
+          </div>
+          <button
+            onClick={startWorkout}
+            className="w-full bg-green-500 hover:bg-green-600 rounded-3xl h-32 flex items-center justify-center shadow-lg transition-all active:scale-95"
+          >
+            <span className="text-3xl font-bold text-white">▶ トレーニング開始</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // FINISHED状態
+  if (state.status === 'FINISHED') {
+    const totalSets = state.logs.length;
+    const totalWeight = state.logs.reduce((sum, log) => sum + (log.weight * log.reps), 0);
+    const duration = state.sessionData.end && state.sessionData.start 
+      ? Math.floor((state.sessionData.end - state.sessionData.start) / 1000)
+      : 0;
+
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+          <div className="text-8xl mb-4">✅</div>
+          <h2 className="text-4xl font-bold mb-2">お疲れ様でした!</h2>
+          <p className="text-lg opacity-70 mb-8">データはNotionへ送信されました</p>
+          
+          <div className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/10">
+            <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
+              <span className="opacity-70">総時間</span>
+              <span className="text-3xl font-mono font-bold">{formatTime(duration)}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
+              <span className="opacity-70">総セット数</span>
+              <span className="text-3xl font-mono font-bold">{totalSets}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="opacity-70">総重量</span>
+              <span className="text-3xl font-mono font-bold">{totalWeight} kg</span>
+            </div>
+          </div>
+
+          <button
+            onClick={resetWorkout}
+            className="w-full bg-blue-500 hover:bg-blue-600 rounded-2xl h-16 flex items-center justify-center transition-all active:scale-95"
+          >
+            <span className="text-xl font-bold text-white">ホームに戻る</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // REST状態
+  if (state.status === 'REST') {
+    const progress = intervalTimer.totalTime > 0 ? intervalTimer.timeLeft / intervalTimer.totalTime : 0;
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+          <p className="text-2xl opacity-70 mb-8">インターバル</p>
+          
+          <div className="mb-8">
+            <div className="text-9xl font-bold text-blue-500">{intervalTimer.timeLeft}</div>
+            <div className="text-3xl opacity-70 mt-2">秒</div>
+          </div>
+
+          <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden mb-12">
+            <div 
+              className="h-full bg-blue-500 transition-all duration-1000"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex gap-4">
+              <button
+                onClick={() => intervalTimer.addTime(10)}
+                className="flex-1 bg-white/5 hover:bg-white/10 rounded-2xl h-16 flex items-center justify-center border border-white/10 transition-all active:scale-95"
+              >
+                <span className="text-xl font-bold">+10秒</span>
+              </button>
+              <button
+                onClick={() => intervalTimer.addTime(30)}
+                className="flex-1 bg-white/5 hover:bg-white/10 rounded-2xl h-16 flex items-center justify-center border border-white/10 transition-all active:scale-95"
+              >
+                <span className="text-xl font-bold">+30秒</span>
+              </button>
+            </div>
+
+            <button
+              onClick={skipRest}
+              className="w-full bg-green-500 hover:bg-green-600 rounded-2xl h-20 flex items-center justify-center transition-all active:scale-95"
+            >
+              <span className="text-2xl font-bold text-white">スキップして次へ</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ACTIVE状態
+  return (
+    <div className="min-h-screen">
+      <div className="max-w-2xl mx-auto p-6">
+        {/* ヘッダー */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <div className="text-4xl font-bold">{formatTime(elapsed)}</div>
+            <div className="text-sm opacity-70">セッション経過時間</div>
+          </div>
+          <button
+            onClick={handleFinishClick}
+            className="bg-red-500 hover:bg-red-600 rounded-xl px-8 py-4 transition-all active:scale-95"
+          >
+            <span className="text-lg font-bold text-white">終了</span>
+          </button>
+        </div>
+
+        {/* 種目選択 */}
+        <button
+          onClick={() => setShowExerciseModal(true)}
+          className="w-full bg-white/5 hover:bg-white/10 rounded-2xl p-6 mb-6 border border-white/10 text-left transition-all active:scale-95"
+        >
+          <div className="text-sm opacity-70 mb-1">{state.currentExercise.part}</div>
+          <div className="flex justify-between items-center">
+            <div className="text-3xl font-bold">{state.currentExercise.name}</div>
+            <div className="text-3xl opacity-70">▼</div>
+          </div>
+          <div className="text-sm opacity-70 mt-2">セット {currentSetNumber}</div>
+        </button>
+
+        {/* 入力フォーム */}
+        <div className="bg-white/5 rounded-2xl p-6 mb-6 border border-white/10">
+          <div className="mb-8">
+            <div className="text-sm opacity-70 mb-3">重量 (kg)</div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => dispatch({ type: 'SET_WEIGHT', weight: Math.max(0, state.weight - 2.5) })}
+                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+              >
+                <span className="text-4xl font-bold">-</span>
+              </button>
+              <div className="text-6xl font-bold">{state.weight}</div>
+              <button
+                onClick={() => dispatch({ type: 'SET_WEIGHT', weight: state.weight + 2.5 })}
+                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+              >
+                <span className="text-4xl font-bold">+</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <div className="text-sm opacity-70 mb-3">回数</div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => dispatch({ type: 'SET_REPS', reps: Math.max(1, state.reps - 1) })}
+                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+              >
+                <span className="text-4xl font-bold">-</span>
+              </button>
+              <div className="text-6xl font-bold">{state.reps}</div>
+              <button
+                onClick={() => dispatch({ type: 'SET_REPS', reps: state.reps + 1 })}
+                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+              >
+                <span className="text-4xl font-bold">+</span>
+              </button>
+            </div>
+          </div>
+
+          {state.logs.some(log => log.exerciseId === state.currentExercise.id) && (
+            <button
+              onClick={copyLastSet}
+              className="w-full bg-white/10 hover:bg-white/20 rounded-xl py-4 transition-all active:scale-95"
+            >
+              <span className="text-base font-bold text-blue-400">前回のセットをコピー</span>
+            </button>
+          )}
+        </div>
+
+        {/* セット記録ボタン */}
+        <button
+          onClick={logSet}
+          className="w-full bg-green-500 hover:bg-green-600 rounded-2xl h-24 flex items-center justify-center mb-6 shadow-lg transition-all active:scale-95"
+        >
+          <span className="text-3xl font-bold text-white">セット記録</span>
+        </button>
+
+        {/* 今日の記録 */}
+        {state.logs.length > 0 && (
+          <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+            <h3 className="text-xl font-bold mb-4">今日の記録</h3>
+            <div className="space-y-3">
+              {state.logs.map((log) => (
+                <div key={log.id} className="flex justify-between items-center py-3 border-b border-white/10 last:border-b-0">
+                  <div>
+                    <div className="text-lg font-bold">{log.exerciseName}</div>
+                    <div className="text-sm opacity-70">{log.bodyPart}</div>
+                  </div>
+                  <div className="text-lg font-mono">
+                    {log.weight}kg × {log.reps}回
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 種目選択モーダル */}
+      {showExerciseModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-end justify-center z-50" onClick={() => setShowExerciseModal(false)}>
+          <div className="bg-zinc-900 rounded-t-3xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-3xl font-bold">種目を選択</h3>
+              <button onClick={() => setShowExerciseModal(false)} className="text-3xl opacity-70 hover:opacity-100">
+                ✕
+              </button>
+            </div>
+            <div className="space-y-2">
+              {EXERCISES.map(exercise => (
+                <button
+                  key={exercise.id}
+                  onClick={() => changeExercise(exercise.id)}
+                  className="w-full text-left py-4 border-b border-white/10 hover:bg-white/5 transition-all active:scale-95"
+                >
+                  <div className="text-xl font-bold">{exercise.name}</div>
+                  <div className="text-sm opacity-70">{exercise.part}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 終了確認モーダル */}
+      {showFinishModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-50" onClick={() => setShowFinishModal(false)}>
+          <div className="bg-zinc-900 rounded-2xl p-8 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold mb-4">トレーニングを終了しますか?</h3>
+            <p className="text-lg opacity-70 mb-8">
+              記録をNotionに送信して終了します。
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowFinishModal(false)}
+                className="flex-1 bg-white/5 hover:bg-white/10 rounded-xl py-4 border border-white/10 transition-all active:scale-95"
+              >
+                <span className="text-lg font-bold">キャンセル</span>
+              </button>
+              <button
+                onClick={confirmFinishWorkout}
+                className="flex-1 bg-red-500 hover:bg-red-600 rounded-xl py-4 transition-all active:scale-95"
+              >
+                <span className="text-lg font-bold text-white">終了</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
