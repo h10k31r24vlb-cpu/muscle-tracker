@@ -132,30 +132,77 @@ export default function Home() {
   // FINISHED状態
   if (state.status === 'FINISHED') {
     const totalSets = state.logs.length;
-    const totalWeight = state.logs.reduce((sum, log) => sum + (log.weight * log.reps), 0);
     const duration = state.sessionData.end && state.sessionData.start 
       ? Math.floor((state.sessionData.end - state.sessionData.start) / 1000)
       : 0;
 
+    // 種目ごとにグループ化
+    const exerciseGroups = state.logs.reduce((groups, log) => {
+      if (!groups[log.exerciseName]) {
+        groups[log.exerciseName] = {
+          name: log.exerciseName,
+          part: log.bodyPart,
+          sets: []
+        };
+      }
+      groups[log.exerciseName].sets.push({ weight: log.weight, reps: log.reps });
+      return groups;
+    }, {} as Record<string, { name: string; part: string; sets: { weight: number; reps: number }[] }>);
+
+    const exercises = Object.values(exerciseGroups);
+
+    // 部位のアイコンマッピング
+    const partIcons: Record<string, string> = {
+      '胸': '💪',
+      '背中': '🦾',
+      '脚': '🦵',
+      '肩': '🏋️',
+      '腕': '💪',
+      '腹筋': '🔥',
+    };
+
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md w-full text-center">
-          <div className="text-8xl mb-4">✅</div>
-          <h2 className="text-4xl font-bold mb-2">お疲れ様でした!</h2>
-          <p className="text-lg opacity-70 mb-8">データはNotionへ送信されました</p>
+      <div className="min-h-screen p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="text-8xl mb-4">✅</div>
+            <h2 className="text-4xl font-bold mb-2">お疲れ様でした!</h2>
+            <p className="text-lg opacity-70 mb-4">データはNotionへ送信されました</p>
+            
+            <div className="flex justify-center gap-8 mb-8">
+              <div>
+                <div className="text-3xl font-mono font-bold">{formatTime(duration)}</div>
+                <div className="text-sm opacity-70">総時間</div>
+              </div>
+              <div>
+                <div className="text-3xl font-mono font-bold">{totalSets}</div>
+                <div className="text-sm opacity-70">総セット数</div>
+              </div>
+            </div>
+          </div>
           
           <div className="bg-white/5 rounded-2xl p-6 mb-8 border border-white/10">
-            <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
-              <span className="opacity-70">総時間</span>
-              <span className="text-3xl font-mono font-bold">{formatTime(duration)}</span>
-            </div>
-            <div className="flex justify-between items-center border-b border-white/10 pb-4 mb-4">
-              <span className="opacity-70">総セット数</span>
-              <span className="text-3xl font-mono font-bold">{totalSets}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="opacity-70">総重量</span>
-              <span className="text-3xl font-mono font-bold">{totalWeight} kg</span>
+            <h3 className="text-2xl font-bold mb-6 text-center">今日のトレーニング</h3>
+            <div className="space-y-6">
+              {exercises.map((exercise, idx) => (
+                <div key={idx} className="border-b border-white/10 last:border-b-0 pb-6 last:pb-0">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-3xl">{partIcons[exercise.part] || '💪'}</span>
+                    <div>
+                      <div className="text-2xl font-bold">{exercise.name}</div>
+                      <div className="text-sm opacity-70">{exercise.part}</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2 pl-12">
+                    {exercise.sets.map((set, setIdx) => (
+                      <div key={setIdx} className="flex justify-between items-center py-2 border-b border-white/5 last:border-b-0">
+                        <span className="opacity-70">セット {setIdx + 1}</span>
+                        <span className="text-xl font-mono font-bold">{set.weight}kg × {set.reps}回</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
