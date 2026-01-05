@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { useSessionTimer } from '@/hooks/use-session-timer';
 import { useIntervalTimer } from '@/hooks/use-interval-timer';
-import { getAllExercises, addCustomExercise, BODY_PARTS, type BodyPart } from '@/constants/exercises';
+import { getAllExercises, addCustomExercise, deleteCustomExercise, BODY_PARTS, type BodyPart } from '@/constants/exercises';
 import { GridPicker } from '@/components/grid-picker';
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/pwa-utils';
 
@@ -508,14 +508,32 @@ export default function Home() {
             </button>
             <div className="space-y-2">
               {exercises.map(exercise => (
-                <button
+                <div
                   key={exercise.id}
-                  onClick={() => changeExercise(exercise.id)}
-                  className="w-full text-left py-4 border-b border-white/10 hover:bg-white/5 transition-all active:scale-95"
+                  className="flex items-center gap-3 py-4 border-b border-white/10"
                 >
-                  <div className="text-xl font-bold">{exercise.name}</div>
-                  <div className="text-sm opacity-70">{exercise.part}</div>
-                </button>
+                  <button
+                    onClick={() => changeExercise(exercise.id)}
+                    className="flex-1 text-left hover:bg-white/5 transition-all active:scale-95 px-3 py-2 rounded-xl"
+                  >
+                    <div className="text-xl font-bold">{exercise.name}</div>
+                    <div className="text-sm opacity-70">{exercise.part}</div>
+                  </button>
+                  {exercise.isCustom && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`「${exercise.name}」を削除しますか？`)) {
+                          deleteCustomExercise(exercise.id);
+                          setExercises(getAllExercises());
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-xl text-red-400 font-bold transition-all active:scale-95"
+                    >
+                      削除
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>

@@ -17,6 +17,7 @@ export interface Exercise {
   id: string;
   name: string;
   part: BodyPart;
+  isCustom?: boolean;
 }
 
 export const EXERCISES: Exercise[] = [
@@ -59,7 +60,18 @@ export function addCustomExercise(name: string, part: BodyPart): Exercise {
 }
 
 export function getAllExercises(): Exercise[] {
-  return [...EXERCISES, ...getCustomExercises()];
+  const defaultExercises = EXERCISES.map(ex => ({ ...ex, isCustom: false }));
+  const customExercises = getCustomExercises().map(ex => ({ ...ex, isCustom: true }));
+  return [...defaultExercises, ...customExercises];
+}
+
+/**
+ * カスタム種目を削除
+ */
+export function deleteCustomExercise(id: string): void {
+  const customExercises = getCustomExercises();
+  const filtered = customExercises.filter(ex => ex.id !== id);
+  localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(filtered));
 }
 
 /**
