@@ -5,7 +5,7 @@ import { useWorkout } from '@/lib/workout-context';
 import { useSessionTimer } from '@/hooks/use-session-timer';
 import { useIntervalTimer } from '@/hooks/use-interval-timer';
 import { getAllExercises, addCustomExercise, BODY_PARTS, type BodyPart } from '@/constants/exercises';
-import { NumberPicker } from '@/components/number-picker';
+import { GridPicker } from '@/components/grid-picker';
 import { registerServiceWorker, requestNotificationPermission } from '@/lib/pwa-utils';
 
 
@@ -354,11 +354,9 @@ export default function Home() {
                 −
               </button>
               
-              <NumberPicker
+              <GridPicker
                 value={state.weight}
                 onChange={(weight) => dispatch({ type: 'SET_WEIGHT', weight })}
-                min={0}
-                max={200}
                 customValues={(() => {
                   const vals: number[] = [];
                   // 0-20kg: 1kg刻み
@@ -416,12 +414,10 @@ export default function Home() {
                 −
               </button>
               
-              <NumberPicker
+              <GridPicker
                 value={state.reps}
                 onChange={(reps) => dispatch({ type: 'SET_REPS', reps })}
-                min={1}
-                max={50}
-                step={1}
+                customValues={Array.from({ length: 50 }, (_, i) => i + 1)}
                 label="回数"
                 unit="回"
               />
