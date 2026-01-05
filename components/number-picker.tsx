@@ -17,7 +17,7 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(value);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // 選択可能な値のリストを生成
   const values: number[] = customValues || (() => {
@@ -30,56 +30,65 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
     return vals;
   })();
   
+  // モーダルを開いた時に現在の値にスクロール
   useEffect(() => {
     if (isOpen && scrollRef.current) {
       // 現在の値に最も近い値を見つける
-      const closestIndex = values.reduce((prevIdx, curr, currIdx) => {
-        return Math.abs(curr - selectedValue) < Math.abs(values[prevIdx] - selectedValue) ? currIdx : prevIdx;
-      }, 0);
+      let closestIndex = 0;
+      let minDiff = Math.abs(values[0] - value);
       
+      for (let i = 1; i < values.length; i++) {
+        const diff = Math.abs(values[i] - value);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIndex = i;
+        }
+      }
+      
+      setSelectedValue(values[closestIndex]);
+      
+      // 初期スクロール位置を設定（遅延なしで即座に）
       const itemHeight = 60;
       scrollRef.current.scrollTop = closestIndex * itemHeight;
-      setSelectedValue(values[closestIndex]);
     }
   }, [isOpen]);
   
   const handleScroll = () => {
-    if (!scrollRef.current || isScrollingRef.current) return;
-    
-    const itemHeight = 60;
-    const scrollTop = scrollRef.current.scrollTop + itemHeight / 2; // 中央にオフセット
-    const index = Math.floor(scrollTop / itemHeight);
-    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
-    
-    if (values[clampedIndex] !== selectedValue) {
-      setSelectedValue(values[clampedIndex]);
-    }
-  };
-  
-  const handleScrollEnd = () => {
     if (!scrollRef.current) return;
     
-    isScrollingRef.current = true;
-    const itemHeight = 60;
-    const scrollTop = scrollRef.current.scrollTop + itemHeight / 2;
-    const index = Math.floor(scrollTop / itemHeight);
-    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
+    // スクロール中のタイムアウトをクリア
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
     
-    // スナップ位置にスムーズにスクロール
-    scrollRef.current.scrollTo({
-      top: clampedIndex * itemHeight,
-      behavior: 'smooth'
-    });
+    const itemHeight = 60;
+    const scrollTop = scrollRef.current.scrollTop;
+    const centerOffset = 120; // 上部パディング
+    const adjustedScrollTop = scrollTop + centerOffset;
+    const index = Math.round(adjustedScrollTop / itemHeight);
+    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
     
     setSelectedValue(values[clampedIndex]);
     
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 100);
+    // スクロール終了後にスナップ
+    scrollTimeoutRef.current = setTimeout(() => {
+      if (scrollRef.current) {
+        const targetScrollTop = clampedIndex * itemHeight;
+        scrollRef.current.scrollTo({
+          top: targetScrollTop,
+          behavior: 'smooth'
+        });
+      }
+    }, 150);
   };
   
   const handleConfirm = () => {
     onChange(selectedValue);
+    setIsOpen(false);
+  };
+  
+  const handleCancel = () => {
+    setSelectedValue(value); // 元の値に戻す
     setIsOpen(false);
   };
   
@@ -94,8 +103,14 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
       </button>
       
       {isOpen && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-50" onClick={() => setIsOpen(false)}>
-          <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-50" 
+          onClick={handleCancel}
+        >
+          <div 
+            className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-2xl font-bold mb-6 text-center">{label}を選択</h3>
             
             <div className="relative h-[300px] overflow-hidden mb-6">
@@ -106,20 +121,22 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
               <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                onTouchEnd={handleScrollEnd}
-                onMouseUp={handleScrollEnd}
                 className="h-full overflow-y-scroll scrollbar-hide"
+                style={{
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
               >
                 {/* 上部のパディング */}
                 <div className="h-[120px]" />
                 
                 {values.map((v, idx) => (
                   <div
-                    key={idx}
+                    key={`${v}-${idx}`}
                     className="h-[60px] flex items-center justify-center text-4xl font-mono font-bold"
                     style={{
-                      opacity: v === selectedValue ? 1 : 0.3,
-                      transform: v === selectedValue ? 'scale(1.2)' : 'scale(1)',
+                      opacity: Math.abs(v - selectedValue) < 0.01 ? 1 : 0.3,
+                      transform: Math.abs(v - selectedValue) < 0.01 ? 'scale(1.2)' : 'scale(1)',
                       transition: 'all 0.2s',
                     }}
                   >
@@ -134,7 +151,7 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
             
             <div className="flex gap-4">
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={handleCancel}
                 className="flex-1 bg-white/5 hover:bg-white/10 rounded-xl py-4 border border-white/10 transition-all active:scale-95"
               >
                 <span className="text-lg font-bold">キャンセル</span>
