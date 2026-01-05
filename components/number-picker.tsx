@@ -18,6 +18,7 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
   const [selectedValue, setSelectedValue] = useState(value);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isAutoScrollingRef = useRef(false);
   
   // 選択可能な値のリストを生成
   const values: number[] = customValues || (() => {
@@ -47,14 +48,20 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
       
       setSelectedValue(values[closestIndex]);
       
-      // 初期スクロール位置を設定（遅延なしで即座に）
+      // 初期スクロール位置を設定
+      isAutoScrollingRef.current = true;
       const itemHeight = 60;
       scrollRef.current.scrollTop = closestIndex * itemHeight;
+      
+      // 少し遅延してから自動スクロールフラグをオフ
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 100);
     }
   }, [isOpen]);
   
   const handleScroll = () => {
-    if (!scrollRef.current) return;
+    if (!scrollRef.current || isAutoScrollingRef.current) return;
     
     // スクロール中のタイムアウトをクリア
     if (scrollTimeoutRef.current) {
@@ -70,14 +77,25 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
     
     setSelectedValue(values[clampedIndex]);
     
-    // スクロール終了後にスナップ
+    // スクロール終了後にスナップ（ユーザーがスクロールを止めた後のみ）
     scrollTimeoutRef.current = setTimeout(() => {
-      if (scrollRef.current) {
+      if (scrollRef.current && !isAutoScrollingRef.current) {
         const targetScrollTop = clampedIndex * itemHeight;
-        scrollRef.current.scrollTo({
-          top: targetScrollTop,
-          behavior: 'smooth'
-        });
+        const currentScrollTop = scrollRef.current.scrollTop;
+        
+        // 既に正しい位置にある場合はスナップしない
+        if (Math.abs(currentScrollTop - targetScrollTop) > 5) {
+          isAutoScrollingRef.current = true;
+          scrollRef.current.scrollTo({
+            top: targetScrollTop,
+            behavior: 'smooth'
+          });
+          
+          // スムーズスクロール完了後にフラグをオフ
+          setTimeout(() => {
+            isAutoScrollingRef.current = false;
+          }, 300);
+        }
       }
     }, 150);
   };
