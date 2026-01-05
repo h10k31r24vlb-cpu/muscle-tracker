@@ -1,0 +1,24 @@
+{
+  "name": "Muscle Tracker - 筋トレ記録アプリ",
+  "short_name": "Muscle Tracker",
+  "description": "インターバルタイマー、セッション管理、Notion連携機能を備えた高機能筋トレ記録アプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#22c55e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

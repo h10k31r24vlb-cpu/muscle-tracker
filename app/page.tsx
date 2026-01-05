@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { useSessionTimer } from '@/hooks/use-session-timer';
 import { useIntervalTimer } from '@/hooks/use-interval-timer';
-import { EXERCISES } from '@/constants/exercises';
+import { getAllExercises, addCustomExercise, BODY_PARTS, type BodyPart } from '@/constants/exercises';
+import { NumberPicker } from '@/components/number-picker';
+import { registerServiceWorker, requestNotificationPermission } from '@/lib/pwa-utils';
 
 
 export default function Home() {
@@ -13,6 +15,19 @@ export default function Home() {
   const intervalTimer = useIntervalTimer();
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState(false);
+  const [newExerciseName, setNewExerciseName] = useState('');
+  const [newExercisePart, setNewExercisePart] = useState<BodyPart>(BODY_PARTS.CHEST);
+  const [exercises, setExercises] = useState(getAllExercises());
+
+  // PWA初期化：Service Worker登録と通知権限リクエスト
+  useEffect(() => {
+    registerServiceWorker();
+    // ワークアウト開始時に通知権限をリクエスト
+    if (state.status === 'active') {
+      requestNotificationPermission();
+    }
+  }, [state.status]);
 
   const startWorkout = () => {
     dispatch({ type: 'START_WORKOUT' });
@@ -91,11 +106,19 @@ export default function Home() {
   };
 
   const changeExercise = (exerciseId: string) => {
-    const exercise = EXERCISES.find(ex => ex.id === exerciseId);
-    if (exercise) {
-      dispatch({ type: 'CHANGE_EXERCISE', exercise });
-      setShowExerciseModal(false);
-    }
+    dispatch({ type: 'CHANGE_EXERCISE', exerciseId });
+    setShowExerciseModal(false);
+  };
+
+  const handleAddCustomExercise = () => {
+    if (!newExerciseName.trim()) return;
+    const newExercise = addCustomExercise(newExerciseName.trim(), newExercisePart);
+    setExercises(getAllExercises());
+    setNewExerciseName('');
+    setNewExercisePart(BODY_PARTS.CHEST);
+    setShowAddExerciseModal(false);
+    // 新しい種目を自動選択
+    dispatch({ type: 'CHANGE_EXERCISE', exerciseId: newExercise.id });
   };
 
   const copyLastSet = () => {
@@ -300,39 +323,66 @@ export default function Home() {
         {/* 入力フォーム */}
         <div className="bg-white/5 rounded-2xl p-6 mb-6 border border-white/10">
           <div className="mb-8">
-            <div className="text-sm opacity-70 mb-3">重量 (kg)</div>
-            <div className="flex items-center justify-between">
+            <div className="flex gap-4">
               <button
-                onClick={() => dispatch({ type: 'SET_WEIGHT', weight: Math.max(0, state.weight - 2.5) })}
-                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+                onClick={() => {
+                  const step = state.weight < 20 ? 1 : 2.5;
+                  dispatch({ type: 'SET_WEIGHT', weight: Math.max(0, state.weight - step) });
+                }}
+                className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
               >
-                <span className="text-4xl font-bold">-</span>
+                −
               </button>
-              <div className="text-6xl font-bold">{state.weight}</div>
+              
+              <NumberPicker
+                value={state.weight}
+                onChange={(weight) => dispatch({ type: 'SET_WEIGHT', weight })}
+                min={0}
+                max={200}
+                step={1}
+                label="重量"
+                unit="kg"
+              />
+              
               <button
-                onClick={() => dispatch({ type: 'SET_WEIGHT', weight: state.weight + 2.5 })}
-                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+                onClick={() => {
+                  const step = state.weight < 20 ? 1 : 2.5;
+                  dispatch({ type: 'SET_WEIGHT', weight: state.weight + step });
+                }}
+                className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
               >
-                <span className="text-4xl font-bold">+</span>
+                +
               </button>
+            </div>
+            <div className="text-center text-sm opacity-70 mt-2">
+              {state.weight < 20 ? '1kg刻みで調整' : '2.5kg刻みで調整'}
             </div>
           </div>
 
           <div className="mb-6">
-            <div className="text-sm opacity-70 mb-3">回数</div>
-            <div className="flex items-center justify-between">
+            <div className="flex gap-4">
               <button
                 onClick={() => dispatch({ type: 'SET_REPS', reps: Math.max(1, state.reps - 1) })}
-                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+                className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
               >
-                <span className="text-4xl font-bold">-</span>
+                −
               </button>
-              <div className="text-6xl font-bold">{state.reps}</div>
+              
+              <NumberPicker
+                value={state.reps}
+                onChange={(reps) => dispatch({ type: 'SET_REPS', reps })}
+                min={1}
+                max={50}
+                step={1}
+                label="回数"
+                unit="回"
+              />
+              
               <button
                 onClick={() => dispatch({ type: 'SET_REPS', reps: state.reps + 1 })}
-                className="bg-white/10 hover:bg-white/20 rounded-xl w-20 h-20 flex items-center justify-center transition-all active:scale-95"
+                className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
               >
-                <span className="text-4xl font-bold">+</span>
+                +
               </button>
             </div>
           </div>
@@ -386,8 +436,17 @@ export default function Home() {
                 ✕
               </button>
             </div>
+            <button
+              onClick={() => {
+                setShowExerciseModal(false);
+                setShowAddExerciseModal(true);
+              }}
+              className="w-full bg-green-500 hover:bg-green-600 rounded-2xl py-4 mb-4 transition-all active:scale-95"
+            >
+              <span className="text-xl font-bold text-white">➕ 新しい種目を追加</span>
+            </button>
             <div className="space-y-2">
-              {EXERCISES.map(exercise => (
+              {exercises.map(exercise => (
                 <button
                   key={exercise.id}
                   onClick={() => changeExercise(exercise.id)}
@@ -397,6 +456,57 @@ export default function Home() {
                   <div className="text-sm opacity-70">{exercise.part}</div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* カスタム種目追加モーダル */}
+      {showAddExerciseModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-6 z-50" onClick={() => setShowAddExerciseModal(false)}>
+          <div className="bg-zinc-900 rounded-2xl p-8 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-2xl font-bold mb-6">新しい種目を追加</h3>
+            
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="block text-sm opacity-70 mb-2">種目名</label>
+                <input
+                  type="text"
+                  value={newExerciseName}
+                  onChange={(e) => setNewExerciseName(e.target.value)}
+                  placeholder="例: インクラインベンチプレス"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-green-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm opacity-70 mb-2">部位</label>
+                <select
+                  value={newExercisePart}
+                  onChange={(e) => setNewExercisePart(e.target.value as BodyPart)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-lg focus:outline-none focus:border-green-500"
+                >
+                  {Object.values(BODY_PARTS).map(part => (
+                    <option key={part} value={part}>{part}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowAddExerciseModal(false)}
+                className="flex-1 bg-white/5 hover:bg-white/10 rounded-xl py-4 border border-white/10 transition-all active:scale-95"
+              >
+                <span className="text-lg font-bold">キャンセル</span>
+              </button>
+              <button
+                onClick={handleAddCustomExercise}
+                disabled={!newExerciseName.trim()}
+                className="flex-1 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl py-4 transition-all active:scale-95"
+              >
+                <span className="text-lg font-bold text-white">追加</span>
+              </button>
             </div>
           </div>
         </div>

@@ -36,8 +36,35 @@ export const EXERCISES: Exercise[] = [
 ];
 
 /**
+ * カスタム種目の管理
+ */
+const CUSTOM_EXERCISES_KEY = 'muscle_tracker_custom_exercises';
+
+export function getCustomExercises(): Exercise[] {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(CUSTOM_EXERCISES_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+export function addCustomExercise(name: string, part: BodyPart): Exercise {
+  const customExercises = getCustomExercises();
+  const newExercise: Exercise = {
+    id: `custom_${Date.now()}`,
+    name,
+    part,
+  };
+  customExercises.push(newExercise);
+  localStorage.setItem(CUSTOM_EXERCISES_KEY, JSON.stringify(customExercises));
+  return newExercise;
+}
+
+export function getAllExercises(): Exercise[] {
+  return [...EXERCISES, ...getCustomExercises()];
+}
+
+/**
  * 種目IDから種目情報を取得
  */
 export function getExerciseById(id: string): Exercise | undefined {
-  return EXERCISES.find(ex => ex.id === id);
+  return getAllExercises().find(ex => ex.id === id);
 }

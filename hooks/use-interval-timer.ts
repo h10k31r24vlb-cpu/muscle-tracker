@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { showIntervalNotification } from '@/lib/pwa-utils';
 
 export function useIntervalTimer() {
   const [timeLeft, setTimeLeft] = useState(0);
@@ -48,6 +49,8 @@ export function useIntervalTimer() {
             if (audioRef.current) {
               audioRef.current.play();
             }
+            // プッシュ通知を表示
+            showIntervalNotification('インターバルが終了しました！次のセットを始めましょう。');
             return 0;
           }
           return prev - 1;
