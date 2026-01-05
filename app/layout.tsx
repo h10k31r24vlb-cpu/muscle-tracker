@@ -6,7 +6,6 @@ export const metadata: Metadata = {
   title: "Muscle Tracker - 高機能筋トレ記録アプリ",
   description: "トレーニング中のUX最適化を重視した筋トレ記録Webアプリ",
   manifest: "/manifest.json",
-  themeColor: "#22c55e",
   viewport: {
     width: "device-width",
     initialScale: 1,

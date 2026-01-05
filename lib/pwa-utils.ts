@@ -8,6 +8,28 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
       scope: '/',
     });
     console.log('Service Worker registered:', registration);
+    
+    // 更新チェック
+    registration.addEventListener('updatefound', () => {
+      const newWorker = registration.installing;
+      if (newWorker) {
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // 新しいバージョンが利用可能
+            console.log('新しいバージョンが利用可能です。リロードします...');
+            // 自動的にリロード
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+            window.location.reload();
+          }
+        });
+      }
+    });
+    
+    // 定期的に更新をチェック（1時間ごと）
+    setInterval(() => {
+      registration.update();
+    }, 60 * 60 * 1000);
+    
     return registration;
   } catch (error) {
     console.error('Service Worker registration failed:', error);

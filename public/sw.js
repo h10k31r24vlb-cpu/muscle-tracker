@@ -1,43 +1,56 @@
-const CACHE_NAME = 'muscle-tracker-v1';
+const CACHE_VERSION = '2.0.0';
+const CACHE_NAME = `muscle-tracker-v${CACHE_VERSION}`;
 const urlsToCache = [
   '/',
   '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
 // インストール時にキャッシュを作成
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing version:', CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 // アクティベーション時に古いキャッシュを削除
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating version:', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// フェッチ時にキャッシュ優先で返す
+// フェッチ時にネットワーク優先で返す（常に最新版を取得）
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        if (response) {
-          return response;
+        // 成功したらキャッシュを更新
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        return fetch(event.request);
+        return response;
+      })
+      .catch(() => {
+        // ネットワークエラー時はキャッシュから返す
+        return caches.match(event.request);
       })
   );
 });
@@ -80,5 +93,10 @@ self.addEventListener('message', (event) => {
       tag: 'interval-notification',
       requireInteraction: false,
     });
+  }
+  
+  // 強制更新リクエスト
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
