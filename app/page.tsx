@@ -342,7 +342,18 @@ export default function Home() {
                 onChange={(weight) => dispatch({ type: 'SET_WEIGHT', weight })}
                 min={0}
                 max={200}
-                step={1}
+                customValues={(() => {
+                  const vals: number[] = [];
+                  // 0-20kg: 1kg刻み
+                  for (let i = 0; i <= 20; i += 1) {
+                    vals.push(i);
+                  }
+                  // 20kg以上: 2.5kg刻み
+                  for (let i = 22.5; i <= 200; i += 2.5) {
+                    vals.push(i);
+                  }
+                  return vals;
+                })()}
                 label="重量"
                 unit="kg"
               />

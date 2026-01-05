@@ -7,44 +7,80 @@ interface NumberPickerProps {
   onChange: (value: number) => void;
   min: number;
   max: number;
-  step: number;
+  step?: number;
   label: string;
   unit?: string;
+  customValues?: number[];
 }
 
-export function NumberPicker({ value, onChange, min, max, step, label, unit = '' }: NumberPickerProps) {
+export function NumberPicker({ value, onChange, min, max, step, label, unit = '', customValues }: NumberPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(value);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
   
   // 選択可能な値のリストを生成
-  const values: number[] = [];
-  for (let i = min; i <= max; i += step) {
-    values.push(i);
-  }
+  const values: number[] = customValues || (() => {
+    const vals: number[] = [];
+    if (step) {
+      for (let i = min; i <= max; i += step) {
+        vals.push(Number(i.toFixed(1)));
+      }
+    }
+    return vals;
+  })();
   
   useEffect(() => {
     if (isOpen && scrollRef.current) {
-      const index = values.findIndex(v => v === selectedValue);
-      if (index !== -1) {
-        const itemHeight = 60;
-        scrollRef.current.scrollTop = index * itemHeight - itemHeight * 2;
-      }
+      // 現在の値に最も近い値を見つける
+      const closestIndex = values.reduce((prevIdx, curr, currIdx) => {
+        return Math.abs(curr - selectedValue) < Math.abs(values[prevIdx] - selectedValue) ? currIdx : prevIdx;
+      }, 0);
+      
+      const itemHeight = 60;
+      scrollRef.current.scrollTop = closestIndex * itemHeight;
+      setSelectedValue(values[closestIndex]);
     }
-  }, [isOpen, selectedValue, values]);
+  }, [isOpen]);
+  
+  const handleScroll = () => {
+    if (!scrollRef.current || isScrollingRef.current) return;
+    
+    const itemHeight = 60;
+    const scrollTop = scrollRef.current.scrollTop + itemHeight / 2; // 中央にオフセット
+    const index = Math.floor(scrollTop / itemHeight);
+    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
+    
+    if (values[clampedIndex] !== selectedValue) {
+      setSelectedValue(values[clampedIndex]);
+    }
+  };
+  
+  const handleScrollEnd = () => {
+    if (!scrollRef.current) return;
+    
+    isScrollingRef.current = true;
+    const itemHeight = 60;
+    const scrollTop = scrollRef.current.scrollTop + itemHeight / 2;
+    const index = Math.floor(scrollTop / itemHeight);
+    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
+    
+    // スナップ位置にスムーズにスクロール
+    scrollRef.current.scrollTo({
+      top: clampedIndex * itemHeight,
+      behavior: 'smooth'
+    });
+    
+    setSelectedValue(values[clampedIndex]);
+    
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 100);
+  };
   
   const handleConfirm = () => {
     onChange(selectedValue);
     setIsOpen(false);
-  };
-  
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const itemHeight = 60;
-    const scrollTop = scrollRef.current.scrollTop;
-    const index = Math.round(scrollTop / itemHeight);
-    const clampedIndex = Math.max(0, Math.min(index, values.length - 1));
-    setSelectedValue(values[clampedIndex]);
   };
   
   return (
@@ -70,8 +106,9 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
               <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-                style={{ scrollSnapType: 'y mandatory' }}
+                onTouchEnd={handleScrollEnd}
+                onMouseUp={handleScrollEnd}
+                className="h-full overflow-y-scroll scrollbar-hide"
               >
                 {/* 上部のパディング */}
                 <div className="h-[120px]" />
@@ -79,7 +116,7 @@ export function NumberPicker({ value, onChange, min, max, step, label, unit = ''
                 {values.map((v, idx) => (
                   <div
                     key={idx}
-                    className="h-[60px] flex items-center justify-center text-4xl font-mono font-bold snap-center"
+                    className="h-[60px] flex items-center justify-center text-4xl font-mono font-bold"
                     style={{
                       opacity: v === selectedValue ? 1 : 0.3,
                       transform: v === selectedValue ? 'scale(1.2)' : 'scale(1)',
