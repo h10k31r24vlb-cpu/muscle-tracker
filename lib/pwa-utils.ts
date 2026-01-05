@@ -50,10 +50,9 @@ export async function showIntervalNotification(message: string = 'インター�
         body: message,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        vibrate: [200, 100, 200, 100, 200],
         tag: 'interval-notification',
         requireInteraction: false,
-      });
+      } as NotificationOptions);
     }
     
     // バイブレーション

@@ -24,7 +24,7 @@ export default function Home() {
   useEffect(() => {
     registerServiceWorker();
     // ワークアウト開始時に通知権限をリクエスト
-    if (state.status === 'active') {
+    if (state.status === 'ACTIVE') {
       requestNotificationPermission();
     }
   }, [state.status]);
@@ -106,7 +106,10 @@ export default function Home() {
   };
 
   const changeExercise = (exerciseId: string) => {
-    dispatch({ type: 'CHANGE_EXERCISE', exerciseId });
+    const exercise = exercises.find(ex => ex.id === exerciseId);
+    if (exercise) {
+      dispatch({ type: 'CHANGE_EXERCISE', exercise });
+    }
     setShowExerciseModal(false);
   };
 
@@ -118,7 +121,7 @@ export default function Home() {
     setNewExercisePart(BODY_PARTS.CHEST);
     setShowAddExerciseModal(false);
     // 新しい種目を自動選択
-    dispatch({ type: 'CHANGE_EXERCISE', exerciseId: newExercise.id });
+    dispatch({ type: 'CHANGE_EXERCISE', exercise: newExercise });
   };
 
   const copyLastSet = () => {
