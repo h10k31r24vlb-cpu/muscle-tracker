@@ -329,17 +329,15 @@ export default function Home() {
             <div className="flex gap-4">
               <button
                 onClick={() => {
-                  // 値リストを生成
+                  // 短押し: 通常の刻み
                   const vals: number[] = [];
                   for (let i = 0; i <= 20; i += 1) vals.push(i);
                   for (let i = 22.5; i <= 200; i += 2.5) vals.push(i);
                   
-                  // 現在の値のインデックスを見つける
                   const currentIndex = vals.findIndex(v => Math.abs(v - state.weight) < 0.01);
                   if (currentIndex > 0) {
                     dispatch({ type: 'SET_WEIGHT', weight: vals[currentIndex - 1] });
                   } else if (currentIndex === -1 && state.weight > 0) {
-                    // 値リストにない場合は最も近い値を選択
                     const closest = vals.reduce((prev, curr) => 
                       Math.abs(curr - state.weight) < Math.abs(prev - state.weight) ? curr : prev
                     );
@@ -347,6 +345,30 @@ export default function Home() {
                     if (closestIndex > 0) {
                       dispatch({ type: 'SET_WEIGHT', weight: vals[closestIndex - 1] });
                     }
+                  }
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  // 長押し: 0.5kg刻み
+                  const newWeight = Math.max(0, state.weight - 0.5);
+                  dispatch({ type: 'SET_WEIGHT', weight: Number(newWeight.toFixed(1)) });
+                }}
+                onTouchStart={(e) => {
+                  const timeout = setTimeout(() => {
+                    // 長押し: 0.5kg刻み
+                    const newWeight = Math.max(0, state.weight - 0.5);
+                    dispatch({ type: 'SET_WEIGHT', weight: Number(newWeight.toFixed(1)) });
+                    // バイブレーションでフィードバック
+                    if ('vibrate' in navigator) {
+                      navigator.vibrate(50);
+                    }
+                  }, 500);
+                  e.currentTarget.dataset.timeout = String(timeout);
+                }}
+                onTouchEnd={(e) => {
+                  const timeout = e.currentTarget.dataset.timeout;
+                  if (timeout) {
+                    clearTimeout(Number(timeout));
                   }
                 }}
                 className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
@@ -375,17 +397,15 @@ export default function Home() {
               
               <button
                 onClick={() => {
-                  // 値リストを生成
+                  // 短押し: 通常の刻み
                   const vals: number[] = [];
                   for (let i = 0; i <= 20; i += 1) vals.push(i);
                   for (let i = 22.5; i <= 200; i += 2.5) vals.push(i);
                   
-                  // 現在の値のインデックスを見つける
                   const currentIndex = vals.findIndex(v => Math.abs(v - state.weight) < 0.01);
                   if (currentIndex !== -1 && currentIndex < vals.length - 1) {
                     dispatch({ type: 'SET_WEIGHT', weight: vals[currentIndex + 1] });
                   } else if (currentIndex === -1) {
-                    // 値リストにない場合は最も近い値を選択
                     const closest = vals.reduce((prev, curr) => 
                       Math.abs(curr - state.weight) < Math.abs(prev - state.weight) ? curr : prev
                     );
@@ -395,13 +415,37 @@ export default function Home() {
                     }
                   }
                 }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  // 長押し: 0.5kg刻み
+                  const newWeight = state.weight + 0.5;
+                  dispatch({ type: 'SET_WEIGHT', weight: Number(newWeight.toFixed(1)) });
+                }}
+                onTouchStart={(e) => {
+                  const timeout = setTimeout(() => {
+                    // 長押し: 0.5kg刻み
+                    const newWeight = state.weight + 0.5;
+                    dispatch({ type: 'SET_WEIGHT', weight: Number(newWeight.toFixed(1)) });
+                    // バイブレーションでフィードバック
+                    if ('vibrate' in navigator) {
+                      navigator.vibrate(50);
+                    }
+                  }, 500);
+                  e.currentTarget.dataset.timeout = String(timeout);
+                }}
+                onTouchEnd={(e) => {
+                  const timeout = e.currentTarget.dataset.timeout;
+                  if (timeout) {
+                    clearTimeout(Number(timeout));
+                  }
+                }}
                 className="w-20 h-32 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-4xl font-bold border border-white/10 transition-all active:scale-95"
               >
                 +
               </button>
             </div>
             <div className="text-center text-sm opacity-70 mt-2">
-              {state.weight < 20 ? '1kg刻みで調整' : '2.5kg刻みで調整'}
+              タップ: {state.weight < 20 ? '1kg' : '2.5kg'}刻み ・ 長押し: 0.5kg刻み
             </div>
           </div>
 
