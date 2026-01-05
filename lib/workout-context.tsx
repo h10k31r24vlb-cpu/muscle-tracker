@@ -42,7 +42,8 @@ type WorkoutAction =
   | { type: 'LOG_SET'; log: WorkoutLog }
   | { type: 'START_REST' }
   | { type: 'END_REST' }
-  | { type: 'SET_SAVING'; isSaving: boolean };
+  | { type: 'SET_SAVING'; isSaving: boolean }
+  | { type: 'RESTORE_DATA'; data: WorkoutState };
 
 const initialState: WorkoutState = {
   status: 'IDLE',
@@ -122,6 +123,13 @@ function workoutReducer(state: WorkoutState, action: WorkoutAction): WorkoutStat
       return {
         ...state,
         isSaving: action.isSaving,
+      };
+
+    case 'RESTORE_DATA':
+      return {
+        ...action.data,
+        // REST状態は復元しない（ショートカットから戻ってきたらACTIVEにする）
+        status: action.data.status === 'REST' ? 'ACTIVE' : action.data.status,
       };
 
     default:

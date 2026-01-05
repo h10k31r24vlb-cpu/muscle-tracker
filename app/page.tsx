@@ -19,6 +19,11 @@ export default function Home() {
   const [newExerciseName, setNewExerciseName] = useState('');
   const [newExercisePart, setNewExercisePart] = useState<BodyPart>(BODY_PARTS.CHEST);
   const [exercises, setExercises] = useState(getAllExercises());
+  const [useShortcut, setUseShortcut] = useState(false);
+
+  // localStorageのキー
+  const WORKOUT_DATA_KEY = 'muscle_tracker_workout_data';
+  const USE_SHORTCUT_KEY = 'muscle_tracker_use_shortcut';
 
   // PWA初期化：Service Worker登録と通知権限リクエスト
   useEffect(() => {
@@ -28,6 +33,38 @@ export default function Home() {
       requestNotificationPermission();
     }
   }, [state.status]);
+
+  // アプリ起動時にlocalStorageからデータを復元
+  useEffect(() => {
+    const savedData = localStorage.getItem(WORKOUT_DATA_KEY);
+    const savedUseShortcut = localStorage.getItem(USE_SHORTCUT_KEY);
+    
+    if (savedUseShortcut) {
+      setUseShortcut(savedUseShortcut === 'true');
+    }
+    
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        // IDLEやFINISHED状態は復元しない
+        if (data.status === 'ACTIVE' || data.status === 'REST') {
+          dispatch({ type: 'RESTORE_DATA', data });
+        }
+      } catch (error) {
+        console.error('Failed to restore workout data:', error);
+      }
+    }
+  }, []);
+
+  // ワークアウトデータがlocalStorageに保存
+  useEffect(() => {
+    if (state.status === 'ACTIVE' || state.status === 'REST') {
+      localStorage.setItem(WORKOUT_DATA_KEY, JSON.stringify(state));
+    } else if (state.status === 'IDLE' || state.status === 'FINISHED') {
+      // ワークアウト終了時はデータを削除
+      localStorage.removeItem(WORKOUT_DATA_KEY);
+    }
+  }, [state]);
 
   const startWorkout = () => {
     dispatch({ type: 'START_WORKOUT' });
@@ -45,7 +82,15 @@ export default function Home() {
     };
     dispatch({ type: 'LOG_SET', log: newLog });
     dispatch({ type: 'START_REST' });
-    intervalTimer.start(90);
+    
+    if (useShortcut) {
+      // ショートカットを起動（2分タイマー）
+      // 注意: ショートカット名はユーザーが設定した名前に合わせる
+      window.location.href = 'shortcuts://run-shortcut?name=筋トレタイマー';
+    } else {
+      // 通常のインターバルタイマー
+      intervalTimer.start(90);
+    }
   };
 
   const skipRest = () => {
@@ -456,6 +501,30 @@ export default function Home() {
               <span className="text-base font-bold text-blue-400">前回のセットをコピー</span>
             </button>
           )}
+        </div>
+
+        {/* ショートカット連携のトグル */}
+        <div className="mb-4 flex items-center justify-between bg-white/5 rounded-xl p-4 border border-white/10">
+          <div>
+            <div className="text-base font-bold">ショートカットタイマー</div>
+            <div className="text-xs opacity-70 mt-1">iOSショートカットでタイマーを起動</div>
+          </div>
+          <button
+            onClick={() => {
+              const newValue = !useShortcut;
+              setUseShortcut(newValue);
+              localStorage.setItem(USE_SHORTCUT_KEY, String(newValue));
+            }}
+            className={`w-14 h-8 rounded-full transition-all ${
+              useShortcut ? 'bg-green-500' : 'bg-white/20'
+            }`}
+          >
+            <div
+              className={`w-6 h-6 bg-white rounded-full transition-all ${
+                useShortcut ? 'ml-7' : 'ml-1'
+              }`}
+            />
+          </button>
         </div>
 
         {/* セット記録ボタン */}
